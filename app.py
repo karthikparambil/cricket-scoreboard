@@ -1,43 +1,40 @@
-import os
-import json
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, flash
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
-
-# FIREBASE IMPORTS
 import firebase_admin
 from firebase_admin import credentials, firestore
+import os
+import json
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='../templates', static_folder='../static')
 
 # SECURITY CONFIGURATION
-# In production, use os.environ.get('SECRET_KEY')
-app.secret_key = os.environ.get('SECRET_KEY', 'change_this_to_a_complex_random_string')
-
-# CREDENTIALS
-ADMIN_USERNAME = "admin"
-# Hash for "password123"
-ADMIN_PASSWORD_HASH = "scrypt:32768:8:1$9DNbv5RtIf9tq3V0$4b1f2fb08a2bf17fcf7b946033f0fe7a6eb0f4206af4d17ac43356398816d8ab3c858cf4f9d03db6a3d66a72f1491f17398130c92a266717af2fe8c06174c210"
+# In Vercel, set this as an Environment Variable, or it will reset on every deploy
+app.secret_key = os.environ.get('SECRET_KEY', 'fallback_secret_key_for_local_testing')
 
 # --- FIREBASE SETUP ---
-# We check if Firebase is already initialized to avoid errors during Vercel's hot-reloading
+# We check if Firebase is already initialized to avoid errors in Vercel's hot-reload
 if not firebase_admin._apps:
-    # We will store the JSON content in an Environment Variable named FIREBASE_CREDENTIALS
-    firebase_creds_str = os.environ.get('FIREBASE_CREDENTIALS')
+    # On Vercel, we will paste the JSON content into an Environment Variable named FIREBASE_CREDS
+    creds_json = os.environ.get('FIREBASE_CREDS')
     
-    if firebase_creds_str:
-        cred_dict = json.loads(firebase_creds_str)
+    if creds_json:
+        cred_dict = json.loads(creds_json)
         cred = credentials.Certificate(cred_dict)
         firebase_admin.initialize_app(cred)
     else:
-        print("WARNING: FIREBASE_CREDENTIALS environment variable not found.")
+        # Fallback for local testing if you have the file locally
+        try:
+            cred = credentials.Certificate("firebase_credentials.json")
+            firebase_admin.initialize_app(cred)
+        except:
+            print("WARNING: Firebase credentials not found.")
 
-# Initialize Firestore Client
-db = firestore.client() if firebase_admin._apps else None
+db = firestore.client()
 
-# CONSTANTS
-COLLECTION_NAME = 'scoreboard'
-DOCUMENT_NAME = 'current_match'
+# --- CONSTANTS ---
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD_HASH = "scrypt:32768:8:1$9DNbv5RtIf9tq3V0$4b1f2fb08a2bf17fcf7b946033f0fe7a6eb0f4206af4d17ac43356398816d8ab3c858cf4f9d03db6a3d66a72f1491f17398130c92a266717af2fe8c06174c210"
 
 LOGO_OPTIONS = [
     {"label": "404", "url": "https://raw.githubusercontent.com/karthikparambil/football-scoreboard/refs/heads/main/static/logos/404.png"},
@@ -54,7 +51,7 @@ LOGO_OPTIONS = [
     {"label": "yg", "url": "https://raw.githubusercontent.com/karthikparambil/football-scoreboard/refs/heads/main/static/logos/yg.png"},
 ]
 
-# DEFAULT STATE (Used if database is empty)
+# DEFAULT STATE (Used if DB is empty)
 DEFAULT_STATE = {
     "team1_name": "India",
     "team1_logo": "https://flagcdn.com/in.svg",
@@ -64,43 +61,30 @@ DEFAULT_STATE = {
     "wickets": 0,
     "overs": 0.0,
     "target": 0,
-    "bat1_name": "Batsman 1", 
+    "bat1_name": "Player 1", 
     "bat1_active": True,
-    "bat2_name": "Batsman 2", 
+    "bat2_name": "Player 2", 
     "bat2_active": False,
     "bowler_name": "Bowler"
 }
 
-# --- DATABASE HELPER FUNCTIONS ---
+# --- DATABASE HELPERS ---
 def get_match_data():
-    """Fetches data from Firestore. Returns default if db fails or is empty."""
-    if not db:
-        return DEFAULT_STATE
-    
-    try:
-        doc_ref = db.collection(COLLECTION_NAME).document(DOCUMENT_NAME)
-        doc = doc_ref.get()
-        if doc.exists:
-            return doc.to_dict()
-        else:
-            # Create the doc if it doesn't exist
-            doc_ref.set(DEFAULT_STATE)
-            return DEFAULT_STATE
-    except Exception as e:
-        print(f"Error reading DB: {e}")
+    """Reads data from Firestore. If not exists, creates it."""
+    doc_ref = db.collection('matches').document('live_match')
+    doc = doc_ref.get()
+    if doc.exists:
+        return doc.to_dict()
+    else:
+        # Initialize DB with defaults
+        doc_ref.set(DEFAULT_STATE)
         return DEFAULT_STATE
 
 def update_match_data(new_data):
-    """Updates Firestore with new data."""
-    if not db:
-        return False
-    try:
-        doc_ref = db.collection(COLLECTION_NAME).document(DOCUMENT_NAME)
-        doc_ref.update(new_data)
-        return True
-    except Exception as e:
-        print(f"Error updating DB: {e}")
-        return False
+    """Updates Firestore data."""
+    doc_ref = db.collection('matches').document('live_match')
+    doc_ref.update(new_data)
+    return get_match_data()
 
 # --- ROUTES ---
 
@@ -115,7 +99,9 @@ def login_required(f):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    # Pass initial data to the template so it loads instantly
+    data = get_match_data()
+    return render_template('index.html', initial_data=data)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -130,7 +116,7 @@ def login():
             session['logged_in'] = True
             return redirect(url_for('admin'))
         else:
-            flash("Invalid credentials. Please try again.", "error")
+            flash("Invalid credentials.", "error")
             
     return render_template('login.html')
 
@@ -142,28 +128,22 @@ def logout():
 @app.route('/admin')
 @login_required 
 def admin():
-    return render_template('admin.html', logo_options=LOGO_OPTIONS)
+    # Fetch current state from DB to populate Admin inputs
+    current_data = get_match_data()
+    return render_template('admin.html', logo_options=LOGO_OPTIONS, data=current_data)
 
 @app.route('/api/data', methods=['GET'])
-def get_data():
-    # Fetch fresh data from Firebase every time
-    current_data = get_match_data()
-    return jsonify(current_data)
+def get_data_api():
+    """API for the frontend to poll for updates"""
+    return jsonify(get_match_data())
 
 @app.route('/api/update', methods=['POST'])
 @login_required
-def update_data():
+def update_data_api():
+    """API called by Admin panel to update DB"""
     data = request.json
-    success = update_match_data(data)
-    
-    if success:
-        # Return the updated state so frontend stays in sync
-        return jsonify({"status": "success", "data": data})
-    else:
-        return jsonify({"status": "error", "message": "Database update failed"}), 500
+    updated_state = update_match_data(data)
+    return jsonify({"status": "success", "data": updated_state})
 
-# Vercel needs the app object to be exposed
-app = app
-
-if __name__ == '__main__':
-    app.run(debug=False, port=5000)
+# This is for Vercel
+app.debug = True

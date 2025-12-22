@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scoreboard Admin</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f3f4f6; padding: 20px; }
+        .card { border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container" style="max-width: 800px;">
+    <h3 class="mb-4 text-center">Scoreboard Control</h3>
+    <form id="adminForm">
+        
+        <div class="card p-3">
+            <h5 class="mb-3 text-dark">Teams & Logos</h5>
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <label>Team 1 Name</label>
+                    <input type="text" class="form-control mb-1" id="team1_name">
+                    <label class="small text-muted">Select Logo</label>
+                    <select id="team1_logo_select" class="form-select form-select-sm mb-1">
+                        <option value="">-- Choose Logo --</option>
+                        {% for logo in logo_options %}
+                            <option value="{{ logo.url }}">{{ logo.label }}</option>
+                        {% endfor %}
+                    </select>
+                    <label class="small text-muted">Team 1 Logo URL</label>
+                    <input type="text" class="form-control form-control-sm" id="team1_logo">
+                </div>
+                <div class="col-md-6">
+                    <label>Team 2 Name</label>
+                    <input type="text" class="form-control mb-1" id="team2_name">
+                    <label class="small text-muted">Select Logo</label>
+                    <select id="team2_logo_select" class="form-select form-select-sm mb-1">
+                        <option value="">-- Choose Logo --</option>
+                        {% for logo in logo_options %}
+                            <option value="{{ logo.url }}">{{ logo.label }}</option>
+                        {% endfor %}
+                    </select>
+                    <label class="small text-muted">Team 2 Logo URL</label>
+                    <input type="text" class="form-control form-control-sm" id="team2_logo">
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-3">
+            <h5 class="mb-3 text-primary">Main Score</h5>
+            <div class="row g-2">
+                <div class="col-3">
+                    <label>Score</label>
+                    <input type="number" class="form-control" id="score">
+                </div>
+                <div class="col-3">
+                    <label>Wickets</label>
+                    <input type="number" class="form-control" id="wickets">
+                </div>
+                <div class="col-3">
+                    <label>Overs</label>
+                    <input type="number" step="0.1" class="form-control" id="overs">
+                </div>
+                <div class="col-3">
+                    <label>Target</label>
+                    <input type="number" class="form-control" id="target">
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="adj(0)">Dot</button>
+                <button type="button" class="btn btn-sm btn-success" onclick="adj(1)">+1</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="adj(4)">+4</button>
+                <button type="button" class="btn btn-sm btn-warning" onclick="adj(6)">+6</button>
+                <button type="button" class="btn btn-sm btn-danger" onclick="adjWicket()">Out</button>
+                <button type="button" class="btn btn-sm btn-dark" onclick="adjBall()">Ball</button>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card p-3">
+                    <h5 class="mb-3 text-success">Batters (Names Only)</h5>
+                    
+                    <div class="mb-2">
+                        <div class="input-group">
+                            <div class="input-group-text">
+                                <input class="form-check-input mt-0" type="radio" name="striker" id="bat1_active" value="bat1">
+                            </div>
+                            <input type="text" class="form-control" id="bat1_name" placeholder="Batter 1 Name">
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="input-group">
+                            <div class="input-group-text">
+                                <input class="form-check-input mt-0" type="radio" name="striker" id="bat2_active" value="bat2">
+                            </div>
+                            <input type="text" class="form-control" id="bat2_name" placeholder="Batter 2 Name">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card p-3">
+                    <h5 class="mb-3 text-danger">Bowler (Name Only)</h5>
+                    <input type="text" class="form-control" id="bowler_name" placeholder="Bowler Name">
+                </div>
+            </div>
+        </div>
+
+        <div class="fixed-bottom bg-white p-3 border-top text-center shadow-lg">
+            <button type="button" class="btn btn-dark btn-lg px-5" onclick="pushData()">
+                <i class="fas fa-satellite-dish"></i> UPDATE BOARD
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Load initial data
+    window.onload = async () => {
+        const response = await fetch('/api/data');
+        const data = await response.json();
+        populateForm(data);
+    };
+
+    function populateForm(data) {
+        document.getElementById('team1_name').value = data.team1_name;
+        document.getElementById('team1_logo').value = data.team1_logo;
+        setLogoSelectValue('team1_logo_select', data.team1_logo);
+        document.getElementById('team2_name').value = data.team2_name;
+        document.getElementById('team2_logo').value = data.team2_logo;
+        setLogoSelectValue('team2_logo_select', data.team2_logo);
+        
+        document.getElementById('score').value = data.score;
+        document.getElementById('wickets').value = data.wickets;
+        document.getElementById('overs').value = data.overs;
+        document.getElementById('target').value = data.target;
+
+        document.getElementById('bat1_name').value = data.bat1_name;
+        document.getElementById('bat1_active').checked = data.bat1_active;
+        document.getElementById('bat2_name').value = data.bat2_name;
+        document.getElementById('bat2_active').checked = data.bat2_active;
+
+        document.getElementById('bowler_name').value = data.bowler_name;
+    }
+
+    function setLogoSelectValue(selectId, value) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        const match = Array.from(select.options).find(opt => opt.value === value);
+        select.value = match ? match.value : '';
+    }
+
+    function hookLogoSelect(selectId, inputId) {
+        const select = document.getElementById(selectId);
+        const input = document.getElementById(inputId);
+        if (!select || !input) return;
+        select.addEventListener('change', () => {
+            if (select.value) {
+                input.value = select.value;
+            }
+        });
+    }
+
+    hookLogoSelect('team1_logo_select', 'team1_logo');
+    hookLogoSelect('team2_logo_select', 'team2_logo');
+
+    // Helper to adjust score quickly
+    function adj(runs) {
+        let s = document.getElementById('score');
+        s.value = parseInt(s.value) + runs;
+        adjBall();
+    }
+    
+    function adjWicket() {
+        let w = document.getElementById('wickets');
+        w.value = parseInt(w.value) + 1;
+        adjBall();
+    }
+
+    function adjBall() {
+        let overs = parseFloat(document.getElementById('overs').value);
+        let balls = Math.round((overs % 1) * 10);
+        let complete = Math.floor(overs);
+        balls++;
+        if (balls >= 6) { complete++; balls = 0; }
+        document.getElementById('overs').value = complete + (balls / 10);
+    }
+
+    async function pushData() {
+        const data = {
+            team1_name: document.getElementById('team1_name').value,
+            team1_logo: document.getElementById('team1_logo').value,
+            team2_name: document.getElementById('team2_name').value,
+            team2_logo: document.getElementById('team2_logo').value,
+            score: parseInt(document.getElementById('score').value),
+            wickets: parseInt(document.getElementById('wickets').value),
+            overs: parseFloat(document.getElementById('overs').value),
+            target: parseInt(document.getElementById('target').value),
+            bat1_name: document.getElementById('bat1_name').value,
+            bat1_active: document.getElementById('bat1_active').checked,
+            bat2_name: document.getElementById('bat2_name').value,
+            bat2_active: document.getElementById('bat2_active').checked,
+            bowler_name: document.getElementById('bowler_name').value
+        };
+
+        const res = await fetch('/api/update', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        
+        const result = await res.json();
+        if(result.status === 'success') {
+            const btn = document.querySelector('.btn-dark');
+            btn.innerHTML = 'UPDATED!';
+            setTimeout(() => { btn.innerHTML = '<i class="fas fa-satellite-dish"></i> UPDATE BOARD'; }, 1000);
+        }
+    }
+</script>
+</body>
+</html>

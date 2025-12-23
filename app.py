@@ -38,19 +38,19 @@ LOGO_OPTIONS = [
 
 # INITIAL DEFAULT STATE
 DEFAULT_STATE = {
-    "team1_name": "India",
-    "team1_logo": "https://flagcdn.com/in.svg",
-    "team2_name": "Australia", 
-    "team2_logo": "https://flagcdn.com/au.svg",
-    "score": 142,
-    "wickets": 3,
-    "overs": 16.4,
-    "target": 180,
-    "bat1_name": "V. Kohli", 
+    "team1_name": "Echo FC",
+    "team1_logo": "https://raw.githubusercontent.com/karthikparambil/football-scoreboard/refs/heads/main/static/logos/echo.png",
+    "team2_name": "Team Offenso", 
+    "team2_logo": "https://raw.githubusercontent.com/karthikparambil/football-scoreboard/refs/heads/main/static/logos/offenso.png",
+    "score": 30,
+    "wickets": 0,
+    "overs": 2.0,
+    "target": 26,
+    "bat1_name": "", 
     "bat1_active": True,
-    "bat2_name": "H. Pandya", 
+    "bat2_name": "", 
     "bat2_active": False,
-    "bowler_name": "P. Cummins"
+    "bowler_name": ""
 }
 
 # --- DATABASE HELPERS ---

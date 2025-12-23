@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Scoreboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --color-white: #ffffff;
+            --color-highlight: #fbbf24;
+            --color-glass-bg: rgba(255, 255, 255, 0.08);
+            --font-main: 'Roboto', sans-serif;
+            --font-display: 'Oswald', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: url('https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?q=80&w=2000&auto=format&fit=crop') no-repeat center center fixed;
+            background-size: cover;
+            color: var(--color-white);
+            font-family: var(--font-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            overflow-x: hidden;
+        }
+
+        .font-display { font-family: var(--font-display); }
+        .hidden { display: none !important; }
+
+        .glass-panel {
+            background: var(--color-glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            border-radius: 24px;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        /* Match Header */
+        .match-header { position: relative; height: 200px; display: flex; align-items: center; justify-content: center; }
+        .bg-glow { position: absolute; width: 75%; height: 75%; background: rgba(59, 130, 246, 0.1); filter: blur(60px); border-radius: 50%; pointer-events: none; }
+        
+        .team-container { flex: 1; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+        .logo-wrapper { width: 140px; height: 100px; display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; }
+        .logo-wrapper img { max-width: 200%; max-height: 140%; object-fit: contain; filter: drop-shadow(0 0 10px rgba(0,0,0,0.5)); }
+        .team-name { font-family: var(--font-display); font-size: 1.8rem; font-weight: 700; text-transform: uppercase; }
+        .vs-text { font-family: var(--font-display); font-weight: 900; font-style: italic; font-size: 3rem; color: rgba(255, 255, 255, 0.2); }
+
+        /* Score Area */
+        .main-score-area { display: flex; flex-direction: column; align-items: center; padding: 1.5rem 0; border-top: 1px solid rgba(255, 255, 255, 0.1); background: rgba(0,0,0,0.3); }
+        .score-display { display: flex; align-items: baseline; gap: 0.75rem; }
+        .score-runs { font-family: var(--font-display); font-size: 6rem; font-weight: 700; line-height: 1; }
+        .score-wickets { font-family: var(--font-display); font-size: 3.75rem; font-weight: 700; color: var(--color-highlight); line-height: 1; }
+        .score-divider { font-size: 3rem; color: rgba(255, 255, 255, 0.3); }
+        .stats-row { display: flex; align-items: center; gap: 1rem; margin-top: 0.5rem; font-size: 1.2rem; font-weight: bold; }
+
+        /* Stats Grid (Batters/Bowlers) */
+        .stats-grid { display: grid; grid-template-columns: 1fr; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.4); }
+        @media (min-width: 768px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
+        
+        .grid-panel { padding: 1.5rem; text-align: center; }
+        .panel-title { font-size: 0.8rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 1rem; letter-spacing: 1px; }
+
+        .player-name { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; padding: 0.5rem; border-radius: 8px; transition: all 0.3s; }
+        .player-name.active { background: rgba(251, 191, 36, 0.2); color: var(--color-highlight); border: 1px solid rgba(251, 191, 36, 0.3); }
+        .player-name.inactive { opacity: 0.5; }
+
+        .button-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 0.6rem 1.4rem;
+            background: rgba(0,0,0,0.4);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--color-white);
+            cursor: pointer;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .btn:hover { transform: translateY(-2px); border-color: var(--color-highlight); }
+        .btn-icon { font-size: 0.9rem; }
+
+        /* Recent matches modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            z-index: 30;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal-card {
+            width: 100%;
+            max-width: 540px;
+            background: rgba(0, 0, 0, 0.75);
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 1.75rem;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: transparent;
+            border: none;
+            color: var(--color-white);
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .recent-title { letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 1rem; }
+        .recent-list { display: flex; flex-direction: column; gap: 0.75rem; }
+        .recent-card {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.9rem 1.1rem;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .recent-card strong { font-size: 1rem; letter-spacing: 0.03em; }
+        .recent-meta { color: #d1d5db; font-size: 0.9rem; }
+
+        @media (max-width: 640px) {
+            .recent-card { flex-direction: column; gap: 0.4rem; }
+            .modal-card { padding: 1.25rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1 class="font-display" style="font-size: 2.75rem; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.75rem;">Live Cricket Scoreboard</h1>
+
+    <div class="button-row">
+        <button id="recent-btn" class="btn" type="button"><i class="fas fa-clock btn-icon"></i> Recent Matches</button>
+    </div>
+
+    <div class="glass-panel">
+        <div class="match-header">
+            <div class="bg-glow"></div>
+            <div class="team-container">
+                <div class="logo-wrapper"><img id="t1-logo" src="" alt="Team 1"></div>
+                <h2 class="team-name" id="t1-name">TEAM 1</h2>
+            </div>
+            <div class="vs-text">VS</div>
+            <div class="team-container">
+                <div class="logo-wrapper"><img id="t2-logo" src="" alt="Team 2"></div>
+                <h2 class="team-name" id="t2-name">TEAM 2</h2>
+            </div>
+        </div>
+
+        <div class="main-score-area">
+            <div class="score-display">
+                <span id="runs" class="score-runs">0</span>
+                <span class="score-divider">/</span>
+                <span id="wickets" class="score-wickets">0</span>
+            </div>
+            <div class="stats-row">
+                <span>OVERS <span id="overs" style="color: var(--color-highlight);">0.0</span></span>
+                <span style="margin-left: 1.5rem;">TARGET <span id="target" style="color: var(--color-highlight);">0</span></span>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="grid-panel" style="border-right: 1px solid rgba(255,255,255,0.1);">
+                <div class="panel-title"><i class="fas fa-baseball-bat-ball"></i> Batting</div>
+                <div id="bat1-name" class="player-name">Bat 1</div>
+                <div id="bat2-name" class="player-name">Bat 2</div>
+            </div>
+
+            <div class="grid-panel">
+                <div class="panel-title"><i class="fas fa-bullseye"></i> Bowling</div>
+                <div id="bowler-name" class="player-name" style="font-size: 1.8rem; margin-top: 1rem;">Bowler</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="recent-modal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="recent-title">
+            <button id="recent-close" class="modal-close" aria-label="Close recent matches"><i class="fas fa-times"></i></button>
+            <h2 id="recent-title" class="font-display recent-title">Recent Matches</h2>
+            <div id="recent-list" class="recent-list"></div>
+        </div>
+    </div>
+
+    <script>
+        const recentBtn = document.getElementById('recent-btn');
+        const recentModal = document.getElementById('recent-modal');
+        const recentClose = document.getElementById('recent-close');
+        const recentListEl = document.getElementById('recent-list');
+
+        const recentMatches = [
+            { fixture: 'IND vs AUS', result: 'IND won by 5 wickets', time: 'Yesterday' },
+            { fixture: 'ENG vs SA', result: 'ENG won by 12 runs', time: '2 days ago' },
+            
+        ];
+
+        function renderRecentMatches() {
+            if (!recentListEl) return;
+            if (recentMatches.length === 0) {
+                recentListEl.innerHTML = '<div class="recent-card"><strong>No recent matches</strong></div>';
+                return;
+            }
+            recentListEl.innerHTML = recentMatches.map(match => `
+                <div class="recent-card">
+                    <div>
+                        <strong>${match.fixture}</strong>
+                        <div class="recent-meta">${match.result}</div>
+                    </div>
+                    <div class="recent-meta">${match.time}</div>
+                </div>
+            `).join('');
+        }
+
+        function toggleRecentModal(show) {
+            recentModal.classList.toggle('active', show);
+            recentModal.setAttribute('aria-hidden', show ? 'false' : 'true');
+            document.body.style.overflow = show ? 'hidden' : '';
+            if (show) renderRecentMatches();
+        }
+
+        recentBtn.addEventListener('click', () => toggleRecentModal(true));
+        recentClose.addEventListener('click', () => toggleRecentModal(false));
+        recentModal.addEventListener('click', (event) => { if (event.target === recentModal) toggleRecentModal(false); });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && recentModal.classList.contains('active')) toggleRecentModal(false); });
+
+        async function fetchMatchData() {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                
+                // Teams & Logos
+                document.getElementById('t1-name').innerText = data.team1_name;
+                document.getElementById('t1-logo').src = data.team1_logo;
+                document.getElementById('t2-name').innerText = data.team2_name;
+                document.getElementById('t2-logo').src = data.team2_logo;
+
+                // Score
+                document.getElementById('runs').innerText = data.score;
+                document.getElementById('wickets').innerText = data.wickets;
+                document.getElementById('overs').innerText = data.overs;
+                document.getElementById('target').innerText = data.target;
+
+                // Batters (Names Only)
+                const b1 = document.getElementById('bat1-name');
+                const b2 = document.getElementById('bat2-name');
+                
+                b1.innerText = data.bat1_name;
+                b2.innerText = data.bat2_name;
+                
+                // Highlight active batter
+                b1.className = data.bat1_active ? 'player-name active' : 'player-name inactive';
+                b2.className = data.bat2_active ? 'player-name active' : 'player-name inactive';
+
+                // Bowler (Name Only)
+                document.getElementById('bowler-name').innerText = data.bowler_name;
+
+            } catch (error) { console.error(error); }
+        }
+
+        setInterval(fetchMatchData, 1000); // Update every second
+        fetchMatchData();
+    </script>
+</body>
+</html>
